@@ -413,6 +413,7 @@ let currentLesson=null,currentMode=0;
 let queue=[],qIdx=0,score=0;
 let wrongWords=[],globalWrong=loadGlobalWrong(),isRetryMode=false;
 let m2slots=[],m2tiles=[];
+let tryCount=0; // 현재 문제 시도 횟수
 
 function loadGlobalWrong(){try{return JSON.parse(localStorage.getItem('globalWrong')||'[]');}catch(e){return[];}}
 function saveGlobalWrong(){try{localStorage.setItem('globalWrong',JSON.stringify(globalWrong));}catch(e){}}
@@ -510,6 +511,8 @@ function renderQuestion(){
   if(input){input.value='';input.className='writing-input';input.disabled=false;}
   document.getElementById('writingHint') && (document.getElementById('writingHint').textContent='');
 
+  tryCount=0;
+
   const box=document.getElementById('questionBox');
   box.style.animation='none';box.offsetHeight;box.style.animation='fadeUp .3s ease';
 
@@ -556,11 +559,25 @@ function renderMode1(w){
 }
 function checkM1(btn,chosen,correct,area){
   [...area.querySelectorAll('.choice-btn')].forEach(b=>b.disabled=true);
-  if(chosen===correct){btn.classList.add('correct');setFeedback(true);score+=10;}
-  else{btn.classList.add('wrong');[...area.querySelectorAll('.choice-btn')].forEach(b=>{if(b.textContent===correct)b.classList.add('correct');});setFeedback(false);addWrong(queue[qIdx]);}
-  // 정답 후 발음 자동 재생
-  setTimeout(()=>speak(queue[qIdx].en),300);
-  document.getElementById('nextBtn').style.display='inline-flex';
+  if(chosen===correct){
+    btn.classList.add('correct');setFeedback(true);score+=tryCount===0?10:5;
+    setTimeout(()=>speak(queue[qIdx].en),300);
+    document.getElementById('nextBtn').style.display='inline-flex';
+  } else {
+    btn.classList.add('wrong');
+    tryCount++;
+    setFeedbackMsg('틀렸어요! 다시 골라보세요 💪','wrong');
+    playSound('wrong');
+    const qbox=document.getElementById('questionBox');
+    qbox.classList.remove('shake');qbox.offsetHeight;qbox.classList.add('shake');
+    setTimeout(()=>qbox.classList.remove('shake'),400);
+    // 틀린 보기만 비활성, 나머지 다시 선택 가능
+    setTimeout(()=>{
+      [...area.querySelectorAll('.choice-btn')].forEach(b=>{
+        if(!b.classList.contains('wrong')) b.disabled=false;
+      });
+    },500);
+  }
 }
 
 // ── 모드2 ──
@@ -616,15 +633,26 @@ function checkM2(w){
   const slots=document.getElementById('slotArea').querySelectorAll('.letter-slot');
   if(ans===correct){
     slots.forEach(s=>s.classList.add('correct-slot'));
-    setFeedback(true);score+=10;
+    setFeedback(true);score+=tryCount===0?10:5;
+    setTimeout(()=>speak(w.en),300);
+    document.getElementById('tileArea').querySelectorAll('.tile').forEach(t=>t.style.pointerEvents='none');
+    document.getElementById('nextBtn').style.display='inline-flex';
   } else {
     slots.forEach(s=>s.classList.add('wrong-slot'));
-    setFeedback(false);addWrong(w);
-    setTimeout(()=>{[...document.getElementById('slotArea').querySelectorAll('.letter-slot')].forEach((s,i)=>{s.textContent=correct[i];s.classList.remove('wrong-slot');s.classList.add('correct-slot');});},600);
+    tryCount++;
+    playSound('wrong');
+    const qbox=document.getElementById('questionBox');
+    qbox.classList.remove('shake');qbox.offsetHeight;qbox.classList.add('shake');
+    setTimeout(()=>qbox.classList.remove('shake'),400);
+    setFeedbackMsg('틀렸어요! 다시 맞춰보세요 💪','wrong');
+    // 슬롯 초기화해서 재도전
+    setTimeout(()=>{
+      m2slots.forEach((ch,i)=>{
+        if(ch!==null){const e=m2tiles.indexOf(null);if(e!==-1)m2tiles[e]=ch;else m2tiles.push(ch);m2slots[i]=null;}
+      });
+      renderSlots(w);renderTiles(w);
+    },800);
   }
-  setTimeout(()=>speak(w.en),300);
-  document.getElementById('tileArea').querySelectorAll('.tile').forEach(t=>t.style.pointerEvents='none');
-  document.getElementById('nextBtn').style.display='inline-flex';
 }
 
 // ── 모드3 ──
@@ -646,16 +674,32 @@ function checkWriting(){
   const val=document.getElementById('writingInput').value.trim().toLowerCase();
   const input=document.getElementById('writingInput');
   if(!val)return;
-  input.disabled=true;
   if(val===w.en.toLowerCase()){
-    input.classList.add('correct');setFeedback(true);score+=10;
+    input.disabled=true;
+    input.classList.add('correct');setFeedback(true);score+=tryCount===0?10:5;
+    setTimeout(()=>speak(w.en),300);
+    document.getElementById('nextBtn').style.display='inline-flex';
   } else {
+    tryCount++;
     input.classList.add('wrong');
-    document.getElementById('writingHint').textContent='정답: '+w.en;
-    setFeedback(false);addWrong(w);
+    playSound('wrong');
+    const qbox=document.getElementById('questionBox');
+    qbox.classList.remove('shake');qbox.offsetHeight;qbox.classList.add('shake');
+    setTimeout(()=>qbox.classList.remove('shake'),400);
+    setFeedbackMsg('틀렸어요! 다시 써보세요 💪','wrong');
+    setTimeout(()=>{
+      input.value='';
+      input.classList.remove('wrong');
+      input.focus();
+      renderCharHint(w,'');
+    },600);
   }
-  setTimeout(()=>speak(w.en),300);
-  document.getElementById('nextBtn').style.display='inline-flex';
+}
+
+function setFeedbackMsg(msg,type){
+  const el=document.getElementById('feedback');
+  el.textContent=msg;
+  el.className='feedback '+type;
 }
 
 // ══════════ 공통 ══════════
