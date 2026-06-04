@@ -273,14 +273,34 @@ body{font-family:'Segoe UI',sans-serif;background:#fff9f0;min-height:100vh;overf
 
 <script>
 // ══════════ 발음 ══════════
+let enVoice=null;
+function loadVoice(){
+  const voices=window.speechSynthesis.getVoices();
+  // 우선순위: Google US English → Microsoft 영어 → en-US → en-GB → en-*
+  enVoice=
+    voices.find(v=>v.name==='Google US English') ||
+    voices.find(v=>v.name.includes('Microsoft') && v.lang==='en-US') ||
+    voices.find(v=>v.lang==='en-US') ||
+    voices.find(v=>v.lang==='en-GB') ||
+    voices.find(v=>v.lang.startsWith('en')) ||
+    null;
+}
+if('speechSynthesis' in window){
+  window.speechSynthesis.onvoiceschanged=loadVoice;
+  loadVoice();
+}
+
 function speak(word){
   if(!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   const utt=new SpeechSynthesisUtterance(word);
-  utt.lang='en-US'; utt.rate=0.85; utt.pitch=1.1;
+  utt.lang='en-US';
+  utt.rate=0.82;
+  utt.pitch=1.0;
+  if(enVoice) utt.voice=enVoice;
 
   const btn=document.getElementById('speakBtn');
-  if(btn){ btn.classList.add('speaking'); }
+  if(btn) btn.classList.add('speaking');
   utt.onend=()=>{ if(btn) btn.classList.remove('speaking'); };
   utt.onerror=()=>{ if(btn) btn.classList.remove('speaking'); };
   window.speechSynthesis.speak(utt);
